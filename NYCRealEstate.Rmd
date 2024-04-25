@@ -1,6 +1,6 @@
 ---
 title: "NYC RealEstate"
-author: "Fredrick Jones"
+author: "Fredrick Jones, Jian Quan Chen, Tilon"
 date: "2024-04-24"
 output:
   html_document: default
@@ -77,6 +77,8 @@ str(clean_nyc)
 
 All numeric variables are heavly skewed to the right,hence a clear indication of outliers
 
+
+All distributions exhibit a highly skewed pattern, with a single bar extending vertically at the rightmost end of the x-axis, suggesting the presence of potential outliers with extremely high unit counts.
 ```{r}
 # Numeric variables
 numeric_vars <- c("RESIDENTIAL.UNITS", "COMMERCIAL.UNITS", "TOTAL.UNITS", 
@@ -113,6 +115,8 @@ for (var in numeric_vars) {
 ```
 
 There was a clear improvement of distribution after removal of outliers
+
+Distribution after applying an outlier removal technique, such as the Interquartile Range (IQR) method. The blue bars show a somewhat more balanced distribution, with the most extreme outliers removed, resulting in a narrower range of residential unit counts.
 ```{r}
 
 num_data <-clean_nyc[, numeric_vars] 
@@ -158,8 +162,7 @@ for (plot in treemap_plots) {
 
 ```
 
-
-
+The darker blue circles indicate a stronger positive correlation, while the lighter blue and red circles represent weaker or negative correlations. For example, there is a strong positive correlation between gross square feet and land square feet, as well as between residential units and total units. However, sale price has a weak or slightly negative correlation with most of the other variables, suggesting that higher sale prices may not necessarily be associated with larger property sizes or more units.
 ```{r}
 print(sum(any(is.na(clean_nyc))))
 
@@ -207,7 +210,7 @@ str(clean_nyc[cat_vars])
 
 2. ANALYSIS
 
-
+Over the years, there is a clear upward trend, indicating that the average real estate prices in NYC have been steadily increasing. The line exhibits a consistent upward slope, with prices rising from around $350,000 in 2005 to over $450,000 by 2020. Although there are some fluctuations in specific years, the overall trajectory demonstrates a significant increase in real estate prices in NYC over the 15-year period depicted in the graph.
 ```{r}
 # Convert SALE_DATE to Date format
 clean_nyc$SALE_DATE <- as.Date(clean_nyc$SALE.DATE)
@@ -245,13 +248,15 @@ ggplot(yearly_prices, aes(x = year, y = avg_price)) +
 str(clean_nyc)
 ```
 
-Key Factors Influencing Real Estate Prices
+###Key Factors Influencing Real Estate Prices
+
+The linear regression model suggests that various factors significantly influence real estate prices in New York City. Notably, residential units, tax class, year built, sale date, tax class at time of sale, gross square feet, and land square feet all demonstrate statistically significant relationships with sale prices. However, the model's adjusted R-squared value of 0.06164 indicates that only about 6.164% of the variability in sale prices is explained by these factors. Additionally, the residuals' distribution reveals a considerable spread, indicating potential heteroscedasticity or unaccounted-for factors in the model.
 ```{r}
 # regression analysis
 lm_model <- lm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, data = clean_nyc)
 summary(lm_model)
 ```
-
+The stepwise regression process, with a starting AIC of 29457675, selected a final model with predictors including residential units, tax class, year built, sale date, tax class at the time of sale, gross square feet, and land square feet. This model, fitted using linear regression, reveals statistically significant relationships between these predictors and sale prices, as indicated by the low p-values and the coefficients' significance levels. However, the adjusted R-squared value remains low at 0.06164, suggesting that this model explains only a small portion of the variability in sale prices. 
 ```{r}
 # Perform stepwise regression
 stepwise_model <- step(lm_model)
@@ -262,6 +267,8 @@ summary(stepwise_model)
 ```
 
 Considering that Normality was not satisfied
+
+The next model fitted using generalized linear regression with a Gaussian family and an identity link function maintains predictors including residential units, tax class, year built, sale date, tax class at the time of sale, gross square feet, and land square feet. The coefficients and their significance remain consistent with the previous models. The null and residual deviances provide additional information on the goodness of fit, with the residual deviance being slightly lower than the null deviance, suggesting some level of model improvement.
 ```{r}
 # Fit GLM with different error distribution and link function
 glm_model <- glm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, 
@@ -271,6 +278,7 @@ summary(glm_model)
 
 
 ```
+The final model, fitted using robust linear regression (rlm), estimates the intercept at $290,788.64. Each additional residential unit increases the sale price by $33,326.57. For the tax class at present, each category shows significant negative impacts on the sale price, with Tax Class 1B having the largest effect, reducing the price by $436,466.67. A one-unit increase in the year built is associated with a $9.05 increase in sale price. Similarly, each day increment in the sale date adds $14.35 to the sale price. Other variables, such as gross square feet and land square feet, also exhibit significant positive effects on the sale price. The residual standard error, indicating the model's accuracy, is $428,200.
 
 ```{r}
 library(MASS)

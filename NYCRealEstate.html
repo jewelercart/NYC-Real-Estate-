@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Fredrick Jones" />
+<meta name="author" content="Fredrick Jones, Jian Quan Chen, Tilon" />
 
 <meta name="date" content="2024-04-24" />
 
@@ -351,7 +351,7 @@ display: none;
 
 
 <h1 class="title toc-ignore">NYC RealEstate</h1>
-<h4 class="author">Fredrick Jones</h4>
+<h4 class="author">Fredrick Jones, Jian Quan Chen, Tilon</h4>
 <h4 class="date">2024-04-24</h4>
 
 </div>
@@ -470,6 +470,9 @@ str(clean_nyc)</code></pre>
 ##   ..- attr(*, &quot;names&quot;)= chr [1:133543] &quot;29&quot; &quot;30&quot; &quot;31&quot; &quot;32&quot; ...</code></pre>
 <p>All numeric variables are heavly skewed to the right,hence a clear
 indication of outliers</p>
+<p>All distributions exhibit a highly skewed pattern, with a single bar
+extending vertically at the rightmost end of the x-axis, suggesting the
+presence of potential outliers with extremely high unit counts.</p>
 <pre class="r"><code># Numeric variables
 numeric_vars &lt;- c(&quot;RESIDENTIAL.UNITS&quot;, &quot;COMMERCIAL.UNITS&quot;, &quot;TOTAL.UNITS&quot;, 
                   &quot;LAND.SQUARE.FEET&quot;, &quot;GROSS.SQUARE.FEET&quot;, &quot;SALE.PRICE&quot;)
@@ -509,6 +512,10 @@ for (var in numeric_vars) {
 }</code></pre>
 <p>There was a clear improvement of distribution after removal of
 outliers</p>
+<p>Distribution after applying an outlier removal technique, such as the
+Interquartile Range (IQR) method. The blue bars show a somewhat more
+balanced distribution, with the most extreme outliers removed, resulting
+in a narrower range of residential unit counts.</p>
 <pre class="r"><code>num_data &lt;-clean_nyc[, numeric_vars] 
 # Create histograms for each numeric variable
 hist_plots &lt;- lapply(numeric_vars, function(var) {
@@ -549,6 +556,14 @@ treemap_plots &lt;- lapply(categorical_vars, function(var) {
 for (plot in treemap_plots) {
   plot
 }</code></pre>
+<p>The darker blue circles indicate a stronger positive correlation,
+while the lighter blue and red circles represent weaker or negative
+correlations. For example, there is a strong positive correlation
+between gross square feet and land square feet, as well as between
+residential units and total units. However, sale price has a weak or
+slightly negative correlation with most of the other variables,
+suggesting that higher sale prices may not necessarily be associated
+with larger property sizes or more units.</p>
 <pre class="r"><code>print(sum(any(is.na(clean_nyc))))</code></pre>
 <pre><code>## [1] 0</code></pre>
 <pre class="r"><code>num_data &lt;- as.data.frame(num_data)
@@ -585,6 +600,13 @@ str(clean_nyc[cat_vars])</code></pre>
 <ol start="2" style="list-style-type: decimal">
 <li>ANALYSIS</li>
 </ol>
+<p>Over the years, there is a clear upward trend, indicating that the
+average real estate prices in NYC have been steadily increasing. The
+line exhibits a consistent upward slope, with prices rising from around
+$350,000 in 2005 to over $450,000 by 2020. Although there are some
+fluctuations in specific years, the overall trajectory demonstrates a
+significant increase in real estate prices in NYC over the 15-year
+period depicted in the graph.</p>
 <pre class="r"><code># Convert SALE_DATE to Date format
 clean_nyc$SALE_DATE &lt;- as.Date(clean_nyc$SALE.DATE)
 
@@ -642,7 +664,17 @@ ggplot(yearly_prices, aes(x = year, y = avg_price)) +
 ##  $ SALE.PRICE                    : num  399000 0 0 0 0 0 0 0 0 0 ...
 ##  $ SALE.DATE                     : chr  &quot;2022-09-29 00:00:00&quot; &quot;2022-03-10 00:00:00&quot; &quot;2022-02-10 00:00:00&quot; &quot;2022-07-20 00:00:00&quot; ...
 ##  $ SALE_DATE                     : Date, format: &quot;2022-09-29&quot; &quot;2022-03-10&quot; ...</code></pre>
-<p>Key Factors Influencing Real Estate Prices</p>
+<p>###Key Factors Influencing Real Estate Prices</p>
+<p>The linear regression model suggests that various factors
+significantly influence real estate prices in New York City. Notably,
+residential units, tax class, year built, sale date, tax class at time
+of sale, gross square feet, and land square feet all demonstrate
+statistically significant relationships with sale prices. However, the
+model’s adjusted R-squared value of 0.06164 indicates that only about
+6.164% of the variability in sale prices is explained by these factors.
+Additionally, the residuals’ distribution reveals a considerable spread,
+indicating potential heteroscedasticity or unaccounted-for factors in
+the model.</p>
 <pre class="r"><code># regression analysis
 lm_model &lt;- lm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, data = clean_nyc)
 summary(lm_model)</code></pre>
@@ -703,6 +735,15 @@ summary(lm_model)</code></pre>
 ## Residual standard error: 367900 on 1149262 degrees of freedom
 ## Multiple R-squared:  0.06165,    Adjusted R-squared:  0.06164 
 ## F-statistic:  4195 on 18 and 1149262 DF,  p-value: &lt; 0.00000000000000022</code></pre>
+<p>The stepwise regression process, with a starting AIC of 29457675,
+selected a final model with predictors including residential units, tax
+class, year built, sale date, tax class at the time of sale, gross
+square feet, and land square feet. This model, fitted using linear
+regression, reveals statistically significant relationships between
+these predictors and sale prices, as indicated by the low p-values and
+the coefficients’ significance levels. However, the adjusted R-squared
+value remains low at 0.06164, suggesting that this model explains only a
+small portion of the variability in sale prices.</p>
 <pre class="r"><code># Perform stepwise regression
 stepwise_model &lt;- step(lm_model)</code></pre>
 <pre><code>## Start:  AIC=29457675
@@ -779,6 +820,14 @@ summary(stepwise_model)</code></pre>
 ## Multiple R-squared:  0.06165,    Adjusted R-squared:  0.06164 
 ## F-statistic:  4195 on 18 and 1149262 DF,  p-value: &lt; 0.00000000000000022</code></pre>
 <p>Considering that Normality was not satisfied</p>
+<p>The next model fitted using generalized linear regression with a
+Gaussian family and an identity link function maintains predictors
+including residential units, tax class, year built, sale date, tax class
+at the time of sale, gross square feet, and land square feet. The
+coefficients and their significance remain consistent with the previous
+models. The null and residual deviances provide additional information
+on the goodness of fit, with the residual deviance being slightly lower
+than the null deviance, suggesting some level of model improvement.</p>
 <pre class="r"><code># Fit GLM with different error distribution and link function
 glm_model &lt;- glm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, 
                  data = clean_nyc, 
@@ -841,6 +890,17 @@ summary(glm_model)</code></pre>
 ## AIC: 32719196
 ## 
 ## Number of Fisher Scoring iterations: 2</code></pre>
+<p>The final model, fitted using robust linear regression (rlm),
+estimates the intercept at $290,788.64. Each additional residential unit
+increases the sale price by $33,326.57. For the tax class at present,
+each category shows significant negative impacts on the sale price, with
+Tax Class 1B having the largest effect, reducing the price by
+$436,466.67. A one-unit increase in the year built is associated with a
+$9.05 increase in sale price. Similarly, each day increment in the sale
+date adds $14.35 to the sale price. Other variables, such as gross
+square feet and land square feet, also exhibit significant positive
+effects on the sale price. The residual standard error, indicating the
+model’s accuracy, is $428,200.</p>
 <pre class="r"><code>library(MASS)
 
 # Fit robust linear regression model
