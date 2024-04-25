@@ -1,0 +1,285 @@
+---
+title: "NYC RealEstate"
+author: "Fredrick Jones"
+date: "2024-04-24"
+output:
+  html_document: default
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r}
+#Clear all
+rm(list = ls())
+
+options(scipen = 999)
+```
+
+
+#Loading Required libraries
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(ggplot2)
+library(tidyr)  
+library(kableExtra)
+library(corrplot)
+library(skimr)
+library(dplyr)
+library(Hmisc)
+library(reshape2)
+library(tidyr)  
+library(MASS)
+library(treemap)
+library(randomForest)
+library(lubridate)
+library(forecast)
+library(caret)
+library(readxl)
+
+```
+
+
+### Loading Data
+
+```{r}
+nyc_data <- read.csv("C:/Users/Public/Real Estate/nyc-property-sales.csv")
+
+head(nyc_data)
+```
+
+
+
+
+
+###Explorartory Data Analysis
+
+#Glipmse of the dataset
+```{r}
+glimpse(nyc_data)
+
+```
+
+Assesing missing values
+```{r}
+# Check for missing values
+missing_values <- colSums(is.na(nyc_data))
+
+# View columns with missing values
+missing_columns <- names(missing_values[missing_values > 0])
+print(missing_columns)
+```
+#Drop missing values since there is less than 5% of dataset missing values hence safe to drop all missing values
+```{r}
+clean_nyc <- na.omit(nyc_data)
+str(clean_nyc)
+```
+
+All numeric variables are heavly skewed to the right,hence a clear indication of outliers
+
+```{r}
+# Numeric variables
+numeric_vars <- c("RESIDENTIAL.UNITS", "COMMERCIAL.UNITS", "TOTAL.UNITS", 
+                  "LAND.SQUARE.FEET", "GROSS.SQUARE.FEET", "SALE.PRICE")
+
+
+num_data <-clean_nyc[, numeric_vars] 
+for (i in 1:length(names(num_data))){
+  print(i)
+  hist( num_data[i], main='hist', breaks=20, prob=TRUE)
+}
+
+
+```
+
+
+```{r}
+# Function to remove outliers based on Tukey's method
+remove_outliers <- function(data, variable) {
+  q1 <- quantile(data[[variable]], 0.25)
+  q3 <- quantile(data[[variable]], 0.75)
+  iqr <- q3 - q1
+  lower_bound <- q1 - 1.5 * iqr
+  upper_bound <- q3 + 1.5 * iqr
+  filtered_data <- data[data[[variable]] >= lower_bound & data[[variable]] <= upper_bound, ]
+  return(filtered_data)
+}
+
+# Apply the function to each numeric variable in clean_nyc
+for (var in numeric_vars) {
+  clean_nyc <- remove_outliers(clean_nyc, var)
+}
+
+```
+
+There was a clear improvement of distribution after removal of outliers
+```{r}
+
+num_data <-clean_nyc[, numeric_vars] 
+# Create histograms for each numeric variable
+hist_plots <- lapply(numeric_vars, function(var) {
+  ggplot(data = num_data, aes_string(x = var)) +
+    geom_histogram(fill = "skyblue", color = "black", bins = 30) +
+    labs(title = paste("Histogram of", var),
+         x = var,
+         y = "Frequency") +
+    theme_minimal()
+})
+
+# Output the histograms
+for (plot in hist_plots) {
+  print(plot)
+}
+
+
+# Drop COMMERCIAL.UNITS variable
+clean_nyc <- clean_nyc[, !names(clean_nyc) %in% "COMMERCIAL.UNITS"]
+
+```
+
+Categorical variables distributions
+```{r}
+library(treemap)
+
+# Categorical variables
+categorical_vars <- c("NEIGHBORHOOD", "BUILDING.CLASS.CATEGORY", 
+                      "TAX.CLASS.AT.PRESENT", "BUILDING.CLASS.AT.PRESENT", 
+                      "TAX.CLASS.AT.TIME.OF.SALE", "BUILDING.CLASS.AT.TIME.OF.SALE")
+
+# Create treemaps for each categorical variable
+treemap_plots <- lapply(categorical_vars, function(var) {
+  treemap(clean_nyc, index = var, vSize = "SALE.PRICE", title = paste("Treemap of", var))
+})
+
+# Output the treemaps
+for (plot in treemap_plots) {
+  plot
+}
+
+```
+
+
+
+```{r}
+print(sum(any(is.na(clean_nyc))))
+
+num_data <- as.data.frame(num_data)
+
+# Drop COMMERCIAL.UNITS variable
+num_data <- num_data[, !names(num_data) %in% "COMMERCIAL.UNITS"]
+
+
+# Remove observations with missing, NaN, and infinite values
+clean_data <- num_data[complete.cases(num_data) & !is.infinite(rowSums(num_data)), ]
+
+# Calculate correlation matrix
+correlation_matrix <- cor(clean_data)
+
+# Plot correlation matrix
+corrplot(correlation_matrix, method = "circle", type = "upper", order = "hclust",
+         addCoef.col = "black", tl.cex = 0.7, cl.cex = 0.7)
+
+
+```
+
+
+
+
+
+
+Transform Categorical Variables to Factors
+```{r}
+
+cat_vars <- c("BUILDING.CLASS.CATEGORY", "TAX.CLASS.AT.PRESENT", "BUILDING.CLASS.AT.PRESENT", "TAX.CLASS.AT.TIME.OF.SALE")
+
+# Convert categorical variables to factors
+for (var in cat_vars) {
+  clean_nyc[[var]] <- factor(clean_nyc[[var]])
+}
+
+# Verify the transformation
+str(clean_nyc[cat_vars])
+
+
+```
+
+
+
+2. ANALYSIS
+
+
+```{r}
+# Convert SALE_DATE to Date format
+clean_nyc$SALE_DATE <- as.Date(clean_nyc$SALE.DATE)
+
+
+# Group data by year and calculate average sale price per year
+yearly_prices <- clean_nyc %>%
+  mutate(year = lubridate::year(SALE_DATE)) %>%
+  group_by(year) %>%
+  summarise(avg_price = mean(SALE.PRICE))
+
+# Create a line plot of average sale price over time (yearly)
+ggplot(yearly_prices, aes(x = year, y = avg_price)) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue", linetype = "solid", size = 1) +  #smoother line without confidence intervals
+  geom_point(color = "blue", size = 3) +  
+  labs(title = "Average Real Estate Prices in NYC",
+       subtitle = "Yearly Trend",
+       x = "Year",
+       y = "Average Sale Price",
+       caption = "Data Source: NYC Real Estate Dataset") +
+  theme_minimal() +  
+  theme(plot.title = element_text(face = "bold", size = 18),
+        plot.subtitle = element_text(size = 14),
+        plot.caption = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10))  
+
+
+```
+
+
+```{r}
+str(clean_nyc)
+```
+
+Key Factors Influencing Real Estate Prices
+```{r}
+# regression analysis
+lm_model <- lm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, data = clean_nyc)
+summary(lm_model)
+```
+
+```{r}
+# Perform stepwise regression
+stepwise_model <- step(lm_model)
+
+# Summary of the stepwise model
+summary(stepwise_model)
+
+```
+
+Considering that Normality was not satisfied
+```{r}
+# Fit GLM with different error distribution and link function
+glm_model <- glm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, 
+                 data = clean_nyc, 
+                 family = gaussian(link = "identity"))
+summary(glm_model)
+
+
+```
+
+```{r}
+library(MASS)
+
+# Fit robust linear regression model
+lm_model_robust <- rlm(SALE.PRICE ~ RESIDENTIAL.UNITS + TAX.CLASS.AT.PRESENT + YEAR.BUILT + SALE_DATE + TAX.CLASS.AT.TIME.OF.SALE + GROSS.SQUARE.FEET + LAND.SQUARE.FEET, 
+                       data = clean_nyc)
+summary(lm_model_robust)
+
+
+```
+
